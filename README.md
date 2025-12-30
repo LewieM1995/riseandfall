@@ -13,7 +13,7 @@ See [LICENSE](LICENSE) for details.
 ## 💼 For Employers
 
 This project demonstrates my skills in:
-- Full-stack development (React + Flask)
+- Full-stack development (React(Not on Github) + Flask)
 - Authentication & security (JWT, password hashing)
 - Database design (SQLite with proper foreign keys)
 - Real-time systems (resource tick service)
