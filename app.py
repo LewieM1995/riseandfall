@@ -27,6 +27,9 @@ app.register_blueprint(sign_up_bp)
 from routes.login import login_bp
 app.register_blueprint(login_bp)
 
+from routes.settlements import settlement_bp
+app.register_blueprint(settlement_bp)
+
 if __name__ == '__main__':
     print("🚀 Starting resource tick service...")
     tick_service = get_tick_service()
