@@ -34,6 +34,20 @@ def seed_db():
             ('castle', 180.0, 90.0, 120.0, 90.0, 2000, 'A fortified castle'),
             ('outpost', 30.0, 90.0, 12.0, 6.0, 50, 'A remote outpost');
     """)
+    
+    
+    # Player settlement seed
+    cursor.execute("""
+        INSERT OR IGNORE INTO settlements
+        (player_id, name, x, y, settlement_type, food, wood, stone, silver, gold)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    """, (
+        2,
+        "Wayles",
+        400, 150,
+        "castle",
+        500, 500, 200, 100, 10
+    ))
 
     # --------------------
     # NPC SETTLEMENTS

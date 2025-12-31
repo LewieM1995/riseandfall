@@ -1,7 +1,8 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, g
 from database_operations.user_operations import authenticate_user
 from validators.auth_validators import validate_email
 from auth_tokens.auth_tokens import create_token
+from db.connection import connect_db
 
 login_bp = Blueprint('login', __name__)
 
@@ -20,10 +21,19 @@ def login():
         if not is_valid_email:
             return jsonify({"error": email_error}), 400
 
-        # authenticate_user handles password checking internally
         user = authenticate_user(email, password)
         if not user:
             return jsonify({"error": "Invalid email or password"}), 401
+
+        # Update last_login and mark user as active
+        conn = connect_db()
+        cursor = conn.cursor()
+        cursor.execute("""
+            UPDATE users 
+            SET is_active = 1, last_login = CURRENT_TIMESTAMP 
+            WHERE id = ?
+        """, (user["id"],))
+        conn.commit()
 
         token = create_token(user["id"])
 
