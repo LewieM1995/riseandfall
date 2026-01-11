@@ -340,4 +340,4 @@ class TestValidateEmail:
         assert valid is True
 
 
-# Run with: pytest test_validation.py -v
+# Run with: python3 -m pytest tests/test_validations.py

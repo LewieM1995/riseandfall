@@ -7,9 +7,9 @@ import os
 load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 
-def require_auth(fn):
+def require_auth(fn: callable) -> callable:
     @wraps(fn)
-    def wrapper(*args, **kwargs):
+    def wrapper(*args: tuple, **kwargs: dict) -> callable:
         token = request.cookies.get("auth_token")
 
         if not token:

@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
-def apply_resource_tick(settlement_id, cursor):
+def apply_resource_tick(settlement_id: int, cursor) -> None:
+    """Apply resource tick to a settlement based on elapsed time and production rates."""
     cursor.execute("""
         SELECT 
             s.food, s.wood, s.stone, s.silver, s.gold,

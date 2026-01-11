@@ -6,7 +6,7 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY")
 ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 
-def decode_token(token: str):
+def decode_token(token: str) -> str | None:
     """
     Decode a JWT token and return the user_id if valid.
     Returns None if token is invalid or expired.

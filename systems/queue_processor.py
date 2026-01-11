@@ -6,7 +6,7 @@ from systems.combat import resolve_attack
 from systems.units import finish_training
 from systems.buildings import finish_build
 
-def process_queue():
+def process_queue() -> None:
     conn = connect_db()
     cursor = conn.cursor()
 

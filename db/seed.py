@@ -3,6 +3,7 @@ from datetime import datetime
 from db.connection import connect_db
 
 def seed_db():
+    """Seed the database with initial data for testing and development."""
     conn = connect_db()
     cursor = conn.cursor()
     cursor.execute("PRAGMA foreign_keys = ON;")
@@ -35,20 +36,6 @@ def seed_db():
             ('outpost', 30.0, 90.0, 12.0, 6.0, 50, 'A remote outpost');
     """)
     
-    
-    # Player settlement seed
-    cursor.execute("""
-        INSERT OR IGNORE INTO settlements
-        (player_id, name, x, y, settlement_type, food, wood, stone, silver, gold)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    """, (
-        2,
-        "Wayles",
-        400, 150,
-        "castle",
-        500, 500, 200, 100, 10
-    ))
-
     # --------------------
     # NPC SETTLEMENTS
     # --------------------
@@ -86,23 +73,29 @@ def seed_db():
     """, unit_types)
 
     # --------------------
-    # NPC ARMIES
+    # NPC PLAYER UNITS (Total Army)
     # --------------------
-    cursor.execute("""
-        INSERT OR IGNORE INTO armies
-        (player_id, location_settlement_id)
-        VALUES (?, ?)
-    """, (npc_enemy_id, northumbria_id))
-
-    npc_army_id = cursor.lastrowid
-
     cursor.executemany("""
-        INSERT OR IGNORE INTO army_units
-        (army_id, unit_type, quantity)
+        INSERT OR IGNORE INTO player_units
+        (player_id, unit_type, quantity)
         VALUES (?, ?, ?)
     """, [
-        (npc_army_id, "infantry", 40),
-        (npc_army_id, "archer", 15)
+        (npc_enemy_id, "infantry", 100),
+        (npc_enemy_id, "archer", 50),
+        (npc_enemy_id, "cavalry", 30)
+    ])
+
+    # --------------------
+    # NPC GARRISON
+    # --------------------
+    cursor.executemany("""
+        INSERT OR IGNORE INTO settlement_garrisons
+        (settlement_id, unit_type, quantity)
+        VALUES (?, ?, ?)
+    """, [
+        (northumbria_id, "infantry", 40),
+        (northumbria_id, "archer", 15),
+        (northumbria_id, "cavalry", 10)
     ])
 
     conn.commit()

@@ -1,6 +1,6 @@
 import re
 
-def validate_password(password):
+def validate_password(password: str) -> tuple[bool, str | None]:
     """Validate password complexity and return specific error messages"""
     if len(password) < 12:
         return False, "Password must be at least 12 characters long"
@@ -19,7 +19,7 @@ def validate_password(password):
     
     return True, None
 
-def validate_username(username):
+def validate_username(username: str) -> tuple[bool, str | None]:
     """Validate username format"""
     if len(username) < 3 or len(username) > 25:
         return False, "Username must be between 3 and 25 characters"
@@ -30,7 +30,7 @@ def validate_username(username):
     return True, None
 
 
-def validate_email(email):
+def validate_email(email: str) -> tuple[bool, str | None]:
     """Validate email format"""
     if not email or len(email) > 254:
         return False, "Invalid email address"

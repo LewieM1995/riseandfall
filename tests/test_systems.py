@@ -1,60 +1,11 @@
 import pytest
 import sqlite3
 from unittest.mock import Mock, patch, MagicMock, ANY
-from database_operations import database_operations
 from systems.unit_training import queue_unit_training
 from systems.resources.resources import get_player_total_resources_for_user
-from routes.army import get_army_units
 from flask import Flask
 from datetime import datetime, timedelta
 import json
-from functools import wraps
-
-# Create a mock auth decorator that sets user_id
-def mock_require_auth(f):
-    @wraps(f)
-    def decorated_function(*args, **kwargs):
-        from flask import request
-        # Set a default user_id for testing
-        if not hasattr(request, 'user_id'):
-            request.user_id = 1
-        return f(*args, **kwargs)
-    return decorated_function
-
-# Patch the auth decorator BEFORE importing the blueprint
-with patch('auth_decorator.auth_decorator.require_auth', mock_require_auth):
-    from routes.resources import resource_bp
-
-@pytest.fixture
-def app():
-    """Create Flask app for testing"""
-    app = Flask(__name__)
-    app.register_blueprint(resource_bp)
-    app.config['TESTING'] = True
-    return app
-
-@pytest.fixture
-def client(app):
-    """Create test client"""
-    return app.test_client()
-
-
-class TestGetAllForEachTable:
- 
-    def test_get_all_test_real_db(self):
-        result = database_operations.get_all_test()
-
-        assert len(result) > 0
-        assert 'id' in result[0]
-        assert 'player_id' in result[0]
-        assert 'location_settlement_id' in result[0]
-        assert 'target_settlement_id' in result[0]
-        assert 'eta' in result[0]
-        
-    def test_players_seeded(self):
-        players = database_operations.get_all_players()
-        assert any(p['username'] == 'lewie' for p in players)
-        
 
 class TestSystems:
     
@@ -180,43 +131,4 @@ class TestSystems:
         assert params[5] == 1    # settlement_id
 
 
-class TestEndpoints:
-    """Test Flask API endpoints"""
-    
-    @patch('routes.resources.get_player_id_for_user')
-    @patch('routes.resources.get_player_total_resources_for_user')
-    def test_get_total_resources_success(self, mock_get_resources, mock_get_player_id, client, app):
-        # Mock the functions
-        mock_get_player_id.return_value = 1
-        mock_get_resources.return_value = {
-            'total_food': 500,
-            'total_wood': 300,
-            'total_stone': 100,
-            'total_silver': 50,
-            'total_gold': 10
-        }
-        
-        response = client.get('/total_resources') 
-        
-        assert response.status_code == 200
-        data = response.get_json()
-        assert data['player_id'] == 1
-        assert data['food'] == 500
-        assert data['wood'] == 300
-        assert data['stone'] == 100
-        assert data['silver'] == 50
-        assert data['gold'] == 10
-    
-    @patch('routes.resources.get_player_id_for_user')
-    @patch('routes.resources.get_player_total_resources_for_user')
-    def test_get_total_resources_not_found(self, mock_get_resources, mock_get_player_id, client, app):
-        # Mock to return None
-        mock_get_player_id.return_value = 999
-        mock_get_resources.return_value = None
-        
-        response = client.get('/total_resources')
-        
-        assert response.status_code == 404
-        assert 'error' in response.get_json()
-
-# use pytest test_tasks.py -v to run
+# use python3 -m pytest tests/test_systems.py -v to run

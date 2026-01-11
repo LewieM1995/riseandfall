@@ -5,7 +5,8 @@ from auth_tokens.decode_token import decode_token
 logout_bp = Blueprint('logout', __name__)
 
 @logout_bp.route('/logout', methods=['POST'])
-def logout():
+def logout() -> tuple[dict, int]:
+    """Endpoint to handle user logout."""
     try:
         conn = connect_db()
         cursor = conn.cursor()

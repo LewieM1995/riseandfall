@@ -3,7 +3,8 @@ import json
 from db.connection import connect_db
 from database_operations.user_operations import get_player_id_for_user
 
-def get_player_total_resources_for_user(user_id: int):
+def get_player_total_resources_for_user(user_id: int) -> dict:
+    """Calculate total resources for a user across all their settlements."""
     player_id = get_player_id_for_user(user_id)
 
     conn = connect_db()

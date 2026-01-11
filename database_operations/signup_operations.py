@@ -1,7 +1,7 @@
 from werkzeug.security import generate_password_hash
 from db.connection import connect_db
 
-def user_exists(email):
+def user_exists(email: str) -> bool:
     conn = connect_db()
     cursor = conn.cursor()
 
@@ -11,7 +11,7 @@ def user_exists(email):
     conn.close()
     return exists
 
-def create_user(username, email, password):
+def create_user(username: str, email: str, password: str) -> dict:
     conn = connect_db()
     cursor = conn.cursor()
 
@@ -30,7 +30,7 @@ def create_user(username, email, password):
     )
     player_id = cursor.lastrowid
 
-    # Create starting settlement(s)
+    # Create starting settlement
     cursor.execute("""
         INSERT INTO settlements
         (player_id, name, x, y, settlement_type, food, wood, stone, silver, gold)
@@ -45,20 +45,22 @@ def create_user(username, email, password):
 
     settlement_id = cursor.lastrowid
 
-    # Create starter army
-    cursor.execute("""
-        INSERT INTO armies (player_id, location_settlement_id)
-        VALUES (?, ?)
-    """, (player_id, settlement_id))
-
-    army_id = cursor.lastrowid
-
+    # Give player starting units (total army)
     cursor.executemany("""
-        INSERT INTO army_units (army_id, unit_type, quantity)
+        INSERT INTO player_units (player_id, unit_type, quantity)
         VALUES (?, ?, ?)
     """, [
-        (army_id, "infantry", 20),
-        (army_id, "archer", 10)
+        (player_id, "infantry", 20),
+        (player_id, "archer", 10)
+    ])
+
+    # garrison some units in the starting settlement
+    cursor.executemany("""
+        INSERT INTO settlement_garrisons (settlement_id, unit_type, quantity)
+        VALUES (?, ?, ?)
+    """, [
+        (settlement_id, "infantry", 10),
+        (settlement_id, "archer", 5)
     ])
 
     conn.commit()

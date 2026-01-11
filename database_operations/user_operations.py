@@ -1,7 +1,7 @@
 from werkzeug.security import check_password_hash
 from db.connection import connect_db
 
-def authenticate_user(email, password):
+def authenticate_user(email: str, password: str) -> dict | None:
     """Authenticate user and return user data if valid"""
     conn = connect_db()
     cursor = conn.cursor()
@@ -21,7 +21,7 @@ def authenticate_user(email, password):
         "email": user['email']
     }
 
-def get_player_id_for_user(user_id):
+def get_player_id_for_user(user_id: int) -> int | None:
     """Get the player_id from the players table for a given user_id"""
     conn = connect_db()
     cursor = conn.cursor()

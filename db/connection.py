@@ -14,6 +14,7 @@ DB_PATH.parent.mkdir(parents=True, exist_ok=True)
 
 
 def connect_db():
+    """Establish a connection to the SQLite database with appropriate settings."""
     conn = sqlite3.connect(
         str(DB_PATH),
         detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES

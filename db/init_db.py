@@ -1,6 +1,7 @@
 from db.connection import connect_db
 
 def init_db():
+    """Initialize the game database with required tables."""
     conn = connect_db()
     cursor = conn.cursor()
 
@@ -31,7 +32,7 @@ def init_db():
     
     
     # --------------------
-    # PLAYERS (Game Entities)
+    # PLAYERS (NPC and User Players)
     # --------------------
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS players (
@@ -111,37 +112,36 @@ def init_db():
     """)
 
     # --------------------
-    # ARMIES
+    # PLAYER UNITS (Total Army)
     # --------------------
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS armies (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
+        CREATE TABLE IF NOT EXISTS player_units (
             player_id INTEGER NOT NULL,
-            location_settlement_id INTEGER,
-            target_settlement_id INTEGER,
-            eta DATETIME,
-
-            FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
-            FOREIGN KEY (location_settlement_id) REFERENCES settlements(id) ON DELETE SET NULL,
-            FOREIGN KEY (target_settlement_id) REFERENCES settlements(id) ON DELETE SET NULL
-        );
-    """)
-
-    # --------------------
-    # ARMY UNITS
-    # --------------------
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS army_units (
-            army_id INTEGER NOT NULL,
             unit_type TEXT NOT NULL,
             quantity INTEGER NOT NULL DEFAULT 0,
-
-            PRIMARY KEY (army_id, unit_type),
-            FOREIGN KEY (army_id) REFERENCES armies(id) ON DELETE CASCADE,
+            
+            PRIMARY KEY (player_id, unit_type),
+            FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
             FOREIGN KEY (unit_type) REFERENCES unit_types(unit_type)
         );
     """)
 
+    # --------------------
+    # SETTLEMENT GARRISONS
+    # --------------------
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS settlement_garrisons (
+            settlement_id INTEGER NOT NULL,
+            unit_type TEXT NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 0,
+            
+            PRIMARY KEY (settlement_id, unit_type),
+            FOREIGN KEY (settlement_id) REFERENCES settlements(id) ON DELETE CASCADE,
+            FOREIGN KEY (unit_type) REFERENCES unit_types(unit_type)
+        );
+    """)
+    
+    
     # --------------------
     # ACTION QUEUE
     # --------------------
@@ -150,6 +150,7 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             player_id INTEGER NOT NULL,
             settlement_id INTEGER NOT NULL,
+            target_settlement_id INTEGER,
             action_type TEXT NOT NULL,
             payload TEXT NOT NULL,
             start_time DATETIME NOT NULL,
@@ -158,7 +159,8 @@ def init_db():
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
             FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
-            FOREIGN KEY (settlement_id) REFERENCES settlements(id) ON DELETE CASCADE
+            FOREIGN KEY (settlement_id) REFERENCES settlements(id) ON DELETE CASCADE,
+            FOREIGN KEY (target_settlement_id) REFERENCES settlements(id) ON DELETE CASCADE
         );
     """)
 
@@ -187,3 +189,5 @@ def init_db():
 
 if __name__ == "__main__":
     init_db()
+    
+    #python3 -m db.init_db

@@ -3,7 +3,7 @@ import json
 
 from db.connection import connect_db
 
-def queue_unit_training(player_id, settlement_id, unit, quantity, duration_minutes):
+def queue_unit_training(player_id: int, settlement_id: int, unit: str, quantity: int, duration_minutes: int) -> None:
     conn = connect_db()
     cursor = conn.cursor()
 

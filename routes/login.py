@@ -7,7 +7,8 @@ from db.connection import connect_db
 login_bp = Blueprint('login', __name__)
 
 @login_bp.route('/login', methods=['POST'])
-def login():
+def login() -> tuple[dict, int]:
+    """Endpoint to handle user login."""
     try:
         data = request.get_json()
         email = data.get('email')
@@ -16,7 +17,6 @@ def login():
         if not email or not password:
             return jsonify({"error": "Email and password are required"}), 400
 
-        # Only validate email format for login
         is_valid_email, email_error = validate_email(email)
         if not is_valid_email:
             return jsonify({"error": email_error}), 400
@@ -25,7 +25,6 @@ def login():
         if not user:
             return jsonify({"error": "Invalid email or password"}), 401
 
-        # Update last_login and mark user as active
         conn = connect_db()
         cursor = conn.cursor()
         cursor.execute("""

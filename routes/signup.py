@@ -5,7 +5,8 @@ from validators.auth_validators import validate_password, validate_username
 sign_up_bp = Blueprint('signup', __name__)
 
 @sign_up_bp.route('/signup', methods=['POST'])
-def signup():
+def signup() -> tuple[dict, int]:
+    """Endpoint to handle user signup."""
     data = request.get_json()
     username = data.get('username')
     email = data.get('email')

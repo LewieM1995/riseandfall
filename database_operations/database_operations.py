@@ -1,18 +1,6 @@
 from db.connection import connect_db
 
-def get_all_test():
-    connection = connect_db()
-    cursor = connection.cursor()
-    
-    cursor.execute("SELECT * FROM armies")
-    rows = cursor.fetchall()
-    
-    item = [dict(row) for row in rows]
-    
-    connection.close()
-    return item
-
-def get_all_players():
+def get_all_players() -> list[dict]:
     """
     Retrieve all players from the database.
 

@@ -9,7 +9,8 @@ resource_bp = Blueprint('resources', __name__)
 
 @resource_bp.route('/total_resources', methods=['GET'])
 @require_auth
-def get_my_total_resources():
+def get_my_total_resources() -> tuple[dict, int]:
+    """Endpoint to retrieve total resources for the authenticated user."""
     try:
         #print(f" Authenticated user_id: {request.user_id}")
         #print(f" About to call get_player_id_for_user: {get_player_id_for_user}")
