@@ -40,6 +40,8 @@ def init_db():
             user_id INTEGER,
             username TEXT NOT NULL UNIQUE,
             is_npc INTEGER DEFAULT 0,
+            level INTEGER DEFAULT 1,
+            experience INTEGER DEFAULT 0,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             last_login_at DATETIME,
             
@@ -182,6 +184,77 @@ def init_db():
         );
     """)
 
+    # --------------------
+    # RESEARCH NODES
+    # --------------------
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS research_nodes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            sector TEXT NOT NULL,
+            name TEXT UNIQUE NOT NULL,
+            description TEXT,
+            required_player_level INTEGER DEFAULT 1,
+            cost_food INTEGER DEFAULT 0,
+            cost_wood INTEGER DEFAULT 0,
+            cost_stone INTEGER DEFAULT 0,
+            cost_silver INTEGER DEFAULT 0,
+            cost_gold INTEGER DEFAULT 0,
+            research_time_hours REAL DEFAULT 0,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_research_nodes_sector ON research_nodes(sector);
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_research_nodes_level ON research_nodes(required_player_level);
+    """)
+
+    # --------------------
+    # PLAYER RESEARCH
+    # --------------------
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS player_research (
+            player_id INTEGER NOT NULL,
+            node_id INTEGER NOT NULL,
+            unlocked_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            
+            PRIMARY KEY (player_id, node_id),
+            FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
+            FOREIGN KEY (node_id) REFERENCES research_nodes(id) ON DELETE CASCADE
+        );
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_player_research_player ON player_research(player_id);
+    """)
+
+    # --------------------
+    # RESEARCH EFFECTS
+    # --------------------
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS research_effects (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            node_id INTEGER NOT NULL,
+            effect_type TEXT NOT NULL,
+            target TEXT NOT NULL,
+            value REAL NOT NULL,
+            description TEXT,
+            
+            FOREIGN KEY (node_id) REFERENCES research_nodes(id) ON DELETE CASCADE
+        );
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_research_effects_node ON research_effects(node_id);
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_research_effects_type ON research_effects(effect_type);
+    """)
+
     conn.commit()
     conn.close()
     print("Game database initialized successfully.")
@@ -190,4 +263,4 @@ def init_db():
 if __name__ == "__main__":
     init_db()
     
-    #python3 -m db.init_db
+#python3 -m db.init_db

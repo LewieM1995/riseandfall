@@ -23,4 +23,18 @@ def get_all_players() -> list[dict]:
 
     return result
 
-    
+def resolve_npc_ids() -> list[dict]:
+    """Get all player_id where user_id is null (NPC settlements)"""
+
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    cursor.execute("""
+        SELECT * from players
+        WHERE user_id IS NULL
+    """)
+
+    npc_id = [dict(row) for row in cursor.fetchall()]
+    conn.close()
+
+    return npc_id

@@ -1,5 +1,6 @@
 from werkzeug.security import generate_password_hash
 from db.connection import connect_db
+from datetime import datetime
 
 def user_exists(email: str) -> bool:
     conn = connect_db()
@@ -62,6 +63,11 @@ def create_user(username: str, email: str, password: str) -> dict:
         (settlement_id, "infantry", 10),
         (settlement_id, "archer", 5)
     ])
+    
+    cursor.execute("""
+       INSERT INTO player_research (player_id, node_id, unlocked_at)
+       VALUES (?, ?, ?)
+    """, (player_id, 1, datetime.now()))  # Starting research node for testing
 
     conn.commit()
     conn.close()

@@ -33,6 +33,12 @@ app.register_blueprint(settlement_bp)
 from routes.logout import logout_bp
 app.register_blueprint(logout_bp)
 
+from routes.neighbors import neighbors
+app.register_blueprint(neighbors)
+
+from routes.research import research
+app.register_blueprint(research)
+
 if __name__ == '__main__':
     print("🚀 Starting resource tick service...")
     tick_service = get_tick_service()
