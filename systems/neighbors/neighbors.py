@@ -1,5 +1,5 @@
 from db.connection import connect_db
-from database_operations.database_operations import resolve_npc_ids
+from database_operations.database_operations import resolve_npc_ids, resolve_settlement_type_ids, resolve_settlement_type_names
 
 def get_all_npc_settlements() -> list[dict]:
     """Retrieve all NPC settlements"""
@@ -14,7 +14,7 @@ def get_all_npc_settlements() -> list[dict]:
         SELECT
             id,
             name,
-            settlement_type,
+            settlement_type_id,
             x,
             y,
             food,
@@ -28,7 +28,17 @@ def get_all_npc_settlements() -> list[dict]:
         ORDER BY created_at ASC
     """.format(','.join('?' * len(npc_player_ids))), npc_player_ids)
 
-    settlements = [dict(row) for row in cursor.fetchall()]
+    settlement_type_names = resolve_settlement_type_names()
+    
+    settlements = []
+    for row in cursor.fetchall():
+        row_dict = dict(row)
+        row_dict['settlement_type'] = settlement_type_names.get(
+            row_dict['settlement_type_id'], 
+            'unknown'
+        )
+        settlements.append(row_dict)
+    
     conn.close()
 
     return settlements

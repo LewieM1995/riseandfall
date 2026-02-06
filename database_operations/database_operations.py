@@ -38,3 +38,28 @@ def resolve_npc_ids() -> list[dict]:
     conn.close()
 
     return npc_id
+
+def resolve_settlement_type_ids() -> dict:
+    """Get mapping of settlement type names to their IDs."""
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id, name FROM settlement_types")
+    settlement_types = {row["name"]: row["id"] for row in cursor.fetchall()}
+
+    conn.close()
+
+    return settlement_types
+
+
+def resolve_settlement_type_names() -> dict:
+    """Get mapping of settlement type IDs to their names."""
+    conn = connect_db()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT id, name FROM settlement_types")
+    settlement_types = {row["id"]: row["name"] for row in cursor.fetchall()}
+
+    conn.close()
+
+    return settlement_types

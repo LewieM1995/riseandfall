@@ -21,7 +21,7 @@ def check_level_up(player_id: int, cursor) -> None:
 
 def calculate_xp_for_level(level: int) -> int:
     """Calculate XP needed to reach a level."""
-    return int(100 * pow(1.5, level - 1))
+    return int(100 * pow(1.60, level - 1))
 
 def get_player_experience(player_id: int) -> dict:
     """Get player's current level and experience."""

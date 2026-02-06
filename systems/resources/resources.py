@@ -24,5 +24,11 @@ def get_player_total_resources_for_user(user_id: int) -> dict:
     result = cursor.fetchone()
     conn.close()
 
-    return dict(result)
+    return {
+        'total_food': int(result['total_food']),
+        'total_wood': int(result['total_wood']),
+        'total_stone': int(result['total_stone']),
+        'total_silver': int(result['total_silver']),
+        'total_gold': int(result['total_gold'])
+    }
 

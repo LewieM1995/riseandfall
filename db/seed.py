@@ -27,28 +27,36 @@ def seed_db():
     # --------------------
     cursor.execute("""
         INSERT OR IGNORE INTO settlement_types
-        (name, food_rate, wood_rate, stone_rate, silver_rate, max_population, description)
+        (name, base_food_rate, base_wood_rate, base_stone_rate, base_silver_rate, description)
         VALUES 
-            ('village', 60.0, 36.0, 24.0, 12.0, 100, 'A small village'),
-            ('town', 120.0, 72.0, 48.0, 30.0, 500, 'A bustling town'),
-            ('city', 240.0, 150.0, 90.0, 60.0, 2000, 'A great city'),
-            ('castle', 180.0, 90.0, 120.0, 90.0, 2000, 'A fortified castle'),
-            ('outpost', 30.0, 90.0, 12.0, 6.0, 50, 'A remote outpost');
+            ('village', 60.0, 36.0, 24.0, 12.0, 'A small village'),
+            ('town', 120.0, 72.0, 48.0, 30.0, 'A bustling town'),
+            ('city', 240.0, 150.0, 90.0, 60.0, 'A great city'),
+            ('castle', 180.0, 90.0, 120.0, 90.0, 'A fortified castle'),
+            ('outpost', 30.0, 90.0, 12.0, 6.0, 'A remote outpost');
     """)
+    
+    cursor.execute("SELECT id, name FROM settlement_types")
+    settlement_type_ids = {name: id for id, name in cursor.fetchall()}
     
     # --------------------
     # NPC SETTLEMENTS
     # --------------------
     cursor.execute("""
         INSERT OR IGNORE INTO settlements
-        (player_id, name, x, y, settlement_type, food, wood, stone, silver, gold)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (player_id, name, x, y, settlement_type_id, 
+         food, wood, stone, silver, gold,
+         base_food_rate, base_wood_rate, base_stone_rate, base_silver_rate,
+         current_food_rate, current_wood_rate, current_stone_rate, current_silver_rate)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, (
         npc_enemy_id,
         "Northumbria",
         400, 150,
-        "castle",
-        1000, 500, 200, 100, 10
+        settlement_type_ids["castle"], 
+        1000, 500, 200, 100, 10,
+        180.0, 90.0, 120.0, 90.0,  # base rates from castle type
+        180.0, 90.0, 120.0, 90.0   # current rates (same as base initially)
     ))
 
     cursor.execute(
@@ -213,3 +221,5 @@ def seed_db():
 
 if __name__ == "__main__":
     seed_db()
+    
+# python3 -m db.seed_db

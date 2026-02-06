@@ -62,12 +62,11 @@ def init_db():
             name TEXT UNIQUE NOT NULL,
             
             -- base resource generation rates (per HOUR)
-            food_rate REAL DEFAULT 60.0,
-            wood_rate REAL DEFAULT 36.0,
-            stone_rate REAL DEFAULT 24.0,
-            silver_rate REAL DEFAULT 12.0,
+            base_food_rate REAL DEFAULT 60.0,
+            base_wood_rate REAL DEFAULT 36.0,
+            base_stone_rate REAL DEFAULT 24.0,
+            base_silver_rate REAL DEFAULT 12.0,
             
-            max_population INTEGER DEFAULT 100,
             description TEXT
         );
     """)
@@ -82,21 +81,65 @@ def init_db():
             name TEXT NOT NULL,
             x INTEGER NOT NULL,
             y INTEGER NOT NULL,
-            settlement_type TEXT NOT NULL DEFAULT 'village',
+            settlement_type_id INTEGER NOT NULL,
 
             -- resources
-            food INTEGER DEFAULT 0,
-            wood INTEGER DEFAULT 0,
-            stone INTEGER DEFAULT 0,
-            silver INTEGER DEFAULT 0,
-            gold INTEGER DEFAULT 0,
+            food REAL DEFAULT 0,
+            wood REAL DEFAULT 0,
+            stone REAL DEFAULT 0,
+            silver REAL DEFAULT 0,
+            gold REAL DEFAULT 0,
             last_resource_tick DATETIME DEFAULT CURRENT_TIMESTAMP,
+            
+            base_food_rate REAL DEFAULT 60.0,
+            base_wood_rate REAL DEFAULT 36.0,
+            base_stone_rate REAL DEFAULT 24.0,
+            base_silver_rate REAL DEFAULT 12.0,
+            
+            current_food_rate REAL DEFAULT 60.0,
+            current_wood_rate REAL DEFAULT 36.0,
+            current_stone_rate REAL DEFAULT 24.0,
+            current_silver_rate REAL DEFAULT 12.0,
+            
+            -- storage capacity
+            food_capacity INTEGER DEFAULT 10000,
+            wood_capacity INTEGER DEFAULT 10000,
+            stone_capacity INTEGER DEFAULT 10000,
+            silver_capacity INTEGER DEFAULT 5000,
+            gold_capacity INTEGER DEFAULT 1000,
 
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
             FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
-            FOREIGN KEY (settlement_type) REFERENCES settlement_types(name) ON DELETE RESTRICT
+            FOREIGN KEY (settlement_type_id) REFERENCES settlement_types(id) ON DELETE RESTRICT
         );
+    """)
+
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS settlement_modifiers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            settlement_id INTEGER NOT NULL,
+            modifier_type TEXT NOT NULL,  -- 'research', 'building_upgrade'
+            resource_type TEXT NOT NULL,  -- 'food', 'wood', 'stone', 'silver'
+            modifier_value REAL NOT NULL, -- e.g., 1.25 for +25% or 10 for +10 flat
+            modifier_operation TEXT DEFAULT 'multiply',  -- 'multiply' or 'add'
+            source_id INTEGER,  -- research_node_id, upgrade_id
+            source_name TEXT,
+            expires_at DATETIME,  -- NULL for permanent modifiers
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            
+            FOREIGN KEY (settlement_id) REFERENCES settlements(id) ON DELETE CASCADE
+        );
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_settlement_modifiers_settlement 
+            ON settlement_modifiers(settlement_id);
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_settlement_modifiers_type 
+            ON settlement_modifiers(modifier_type);
     """)
 
     # --------------------
