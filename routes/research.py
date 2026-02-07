@@ -1,6 +1,6 @@
 from flask import Blueprint, jsonify, request, g
 from db.connection import connect_db
-from systems.research.research_nodes import fetch_research_nodes_unlocked, get_all_research_nodes
+from systems.research.research_nodes import fetch_research_nodes_unlocked, get_all_research_nodes, unlock_research_node
 from database_operations.user_operations import get_player_id_for_user
 from auth_decorator.auth_decorator import require_auth
 
@@ -49,6 +49,26 @@ def get_research_unlocked() -> tuple[dict, int]:
         player_id = get_player_id_for_user(request.user_id)
         unlocked_research = fetch_research_nodes_unlocked(player_id)
         return jsonify({"unlocked_research": unlocked_research}), 200
+    except Exception as e:
+        print("ERROR:", e)
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+    
+@research.route('/unlock_research_node', methods=['POST'])
+@require_auth
+def unlock_research_node_endpoint() -> tuple[dict, int]:
+    try:
+        data = request.get_json()
+        node_id = data.get('node_id')
+        
+        if node_id is None:
+            return jsonify({"error": "node_id is required"}), 400
+        
+        player_id = get_player_id_for_user(request.user_id)
+        unlock_research_node(player_id, node_id)
+        
+        return jsonify({"message": f"Research node {node_id} unlocked for player {player_id}"}), 200
     except Exception as e:
         print("ERROR:", e)
         import traceback

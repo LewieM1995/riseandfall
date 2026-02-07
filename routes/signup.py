@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from database_operations.signup_operations import create_user, user_exists
 from validators.auth_validators import validate_password, validate_username
+from auth_tokens.auth_tokens import create_token
 
 sign_up_bp = Blueprint('signup', __name__)
 
@@ -36,9 +37,31 @@ def signup() -> tuple[dict, int]:
     try:
         user = create_user(username, email, password)
         
-        return jsonify({
+        # Create token
+        token = create_token(user["id"])
+        
+        # Build response
+        response = jsonify({
             "message": "User created successfully",
-            "user": {"username": user["username"], "email": user["email"], "id": user["id"]}
-        }), 201
+            "user": {
+                "id": user["id"],
+                "username": user["username"],
+                "email": user["email"]
+            }
+        })
+        
+        # Set auth cookie
+        response.set_cookie(
+            "auth_token",
+            token,
+            httponly=True,
+            samesite="Lax",
+            secure=False,  # True in production
+            max_age=3600 * 24 * 7  # 7 days
+        )
+        
+        return response, 201
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         return jsonify({"error": "Failed to create user"}), 500
