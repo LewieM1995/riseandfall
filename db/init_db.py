@@ -52,27 +52,9 @@ def init_db():
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_players_user_id ON players(user_id);
     """)
-    
-    # ----------------
-    # SETTLEMENT TYPES
-    # --------------------
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS settlement_types (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE NOT NULL,
-            
-            -- base resource generation rates (per HOUR)
-            base_food_rate REAL DEFAULT 60.0,
-            base_wood_rate REAL DEFAULT 36.0,
-            base_stone_rate REAL DEFAULT 24.0,
-            base_silver_rate REAL DEFAULT 12.0,
-            
-            description TEXT
-        );
-    """)
 
     # --------------------
-    # SETTLEMENTS
+    # SETTLEMENTS (Simplified - just locations)
     # --------------------
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS settlements (
@@ -81,65 +63,180 @@ def init_db():
             name TEXT NOT NULL,
             x INTEGER NOT NULL,
             y INTEGER NOT NULL,
-            settlement_type_id INTEGER NOT NULL,
-
-            -- resources
-            food REAL DEFAULT 0,
-            wood REAL DEFAULT 0,
-            stone REAL DEFAULT 0,
-            silver REAL DEFAULT 0,
-            gold REAL DEFAULT 0,
-            last_resource_tick DATETIME DEFAULT CURRENT_TIMESTAMP,
-            
-            base_food_rate REAL DEFAULT 60.0,
-            base_wood_rate REAL DEFAULT 36.0,
-            base_stone_rate REAL DEFAULT 24.0,
-            base_silver_rate REAL DEFAULT 12.0,
-            
-            current_food_rate REAL DEFAULT 60.0,
-            current_wood_rate REAL DEFAULT 36.0,
-            current_stone_rate REAL DEFAULT 24.0,
-            current_silver_rate REAL DEFAULT 12.0,
-            
-            -- storage capacity
-            food_capacity INTEGER DEFAULT 10000,
-            wood_capacity INTEGER DEFAULT 10000,
-            stone_capacity INTEGER DEFAULT 10000,
-            silver_capacity INTEGER DEFAULT 5000,
-            gold_capacity INTEGER DEFAULT 1000,
-
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
-            FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
-            FOREIGN KEY (settlement_type_id) REFERENCES settlement_types(id) ON DELETE RESTRICT
+            FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
         );
     """)
 
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS settlement_modifiers (
+        CREATE INDEX IF NOT EXISTS idx_settlements_player ON settlements(player_id);
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_settlements_coords ON settlements(x, y);
+    """)
+
+    # --------------------
+    # WORKER TYPES
+    # --------------------
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS worker_types (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            description TEXT
+        );
+    """)
+
+    # --------------------
+    # SETTLEMENT WORKERS
+    # --------------------
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS settlement_workers (
             settlement_id INTEGER NOT NULL,
-            modifier_type TEXT NOT NULL,  -- 'research', 'building_upgrade'
-            resource_type TEXT NOT NULL,  -- 'food', 'wood', 'stone', 'silver'
-            modifier_value REAL NOT NULL, -- e.g., 1.25 for +25% or 10 for +10 flat
-            modifier_operation TEXT DEFAULT 'multiply',  -- 'multiply' or 'add'
-            source_id INTEGER,  -- research_node_id, upgrade_id
-            source_name TEXT,
-            expires_at DATETIME,  -- NULL for permanent modifiers
+            worker_type_id INTEGER NOT NULL,
+            quantity INTEGER NOT NULL DEFAULT 0,
+            
+            PRIMARY KEY (settlement_id, worker_type_id),
+            FOREIGN KEY (settlement_id) REFERENCES settlements(id) ON DELETE CASCADE,
+            FOREIGN KEY (worker_type_id) REFERENCES worker_types(id) ON DELETE CASCADE
+        );
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_settlement_workers_settlement 
+            ON settlement_workers(settlement_id);
+    """)
+
+    # --------------------
+    # ACTIVITY TYPES
+    # --------------------
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS activity_types (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            description TEXT,
+            worker_type_id INTEGER NOT NULL,
+            produces_resource TEXT NOT NULL,
+            base_resource_per_hour REAL NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
             
+            FOREIGN KEY (worker_type_id) REFERENCES worker_types(id) ON DELETE RESTRICT
+        );
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_activity_types_worker 
+            ON activity_types(worker_type_id);
+    """)
+
+    # --------------------
+    # SETTLEMENT ACTIVITIES
+    # --------------------
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS settlement_activities (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            settlement_id INTEGER NOT NULL,
+            activity_type_id INTEGER NOT NULL,
+            assigned_workers INTEGER NOT NULL,
+            started_at DATETIME NOT NULL,
+            completed_at DATETIME,
+            resource_output REAL DEFAULT 0,
+            status TEXT DEFAULT 'in_progress',
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            
+            FOREIGN KEY (settlement_id) REFERENCES settlements(id) ON DELETE CASCADE,
+            FOREIGN KEY (activity_type_id) REFERENCES activity_types(id) ON DELETE RESTRICT
+        );
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_settlement_activities_settlement 
+            ON settlement_activities(settlement_id);
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_settlement_activities_status 
+            ON settlement_activities(status);
+    """)
+
+    # --------------------
+    # SETTLEMENT RESOURCES (Simplified)
+    # --------------------
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS settlement_resources (
+            settlement_id INTEGER NOT NULL,
+            resource_type TEXT NOT NULL,
+            quantity REAL DEFAULT 0,
+            last_updated DATETIME DEFAULT CURRENT_TIMESTAMP,
+            
+            PRIMARY KEY (settlement_id, resource_type),
             FOREIGN KEY (settlement_id) REFERENCES settlements(id) ON DELETE CASCADE
         );
     """)
 
     cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_settlement_modifiers_settlement 
-            ON settlement_modifiers(settlement_id);
+        CREATE INDEX IF NOT EXISTS idx_settlement_resources_settlement 
+            ON settlement_resources(settlement_id);
+    """)
+
+    # --------------------
+    # ACTIVITY MODIFIERS (Buffs/Debuffs)
+    # --------------------
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS activity_modifiers (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            settlement_id INTEGER NOT NULL,
+            modifier_type TEXT NOT NULL,
+            activity_type_id INTEGER,
+            multiplier REAL NOT NULL DEFAULT 1.0,
+            expires_at DATETIME,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+            
+            FOREIGN KEY (settlement_id) REFERENCES settlements(id) ON DELETE CASCADE,
+            FOREIGN KEY (activity_type_id) REFERENCES activity_types(id) ON DELETE CASCADE
+        );
     """)
 
     cursor.execute("""
-        CREATE INDEX IF NOT EXISTS idx_settlement_modifiers_type 
-            ON settlement_modifiers(modifier_type);
+        CREATE INDEX IF NOT EXISTS idx_activity_modifiers_settlement 
+            ON activity_modifiers(settlement_id);
+    """)
+
+    # --------------------
+    # STRUCTURES (Buildable)
+    # --------------------
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS structures (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            description TEXT,
+            provides TEXT,
+            build_time_hours REAL NOT NULL,
+            requires_resources TEXT,
+            created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        );
+    """)
+
+    # --------------------
+    # SETTLEMENT STRUCTURES
+    # --------------------
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS settlement_structures (
+            settlement_id INTEGER NOT NULL,
+            structure_id INTEGER NOT NULL,
+            quantity INTEGER DEFAULT 1,
+            completed_at DATETIME,
+            
+            PRIMARY KEY (settlement_id, structure_id),
+            FOREIGN KEY (settlement_id) REFERENCES settlements(id) ON DELETE CASCADE,
+            FOREIGN KEY (structure_id) REFERENCES structures(id) ON DELETE CASCADE
+        );
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_settlement_structures_settlement 
+            ON settlement_structures(settlement_id);
     """)
 
     # --------------------
@@ -147,7 +244,8 @@ def init_db():
     # --------------------
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS unit_types (
-            unit_type TEXT PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
             attack INTEGER NOT NULL,
             defense INTEGER NOT NULL,
             health INTEGER NOT NULL,
@@ -157,33 +255,43 @@ def init_db():
     """)
 
     # --------------------
-    # PLAYER UNITS (Total Army)
+    # SETTLEMENT UNITS (Units at each settlement)
     # --------------------
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS player_units (
-            player_id INTEGER NOT NULL,
-            unit_type TEXT NOT NULL,
+        CREATE TABLE IF NOT EXISTS settlement_units (
+            settlement_id INTEGER NOT NULL,
+            unit_type_id INTEGER NOT NULL,
             quantity INTEGER NOT NULL DEFAULT 0,
             
-            PRIMARY KEY (player_id, unit_type),
-            FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
-            FOREIGN KEY (unit_type) REFERENCES unit_types(unit_type)
+            PRIMARY KEY (settlement_id, unit_type_id),
+            FOREIGN KEY (settlement_id) REFERENCES settlements(id) ON DELETE CASCADE,
+            FOREIGN KEY (unit_type_id) REFERENCES unit_types(id) ON DELETE CASCADE
         );
     """)
 
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_settlement_units_settlement 
+            ON settlement_units(settlement_id);
+    """)
+
     # --------------------
-    # SETTLEMENT GARRISONS
+    # GARRISON UNITS (Units defending a settlement)
     # --------------------
     cursor.execute("""
-        CREATE TABLE IF NOT EXISTS settlement_garrisons (
+        CREATE TABLE IF NOT EXISTS garrison_units (
             settlement_id INTEGER NOT NULL,
-            unit_type TEXT NOT NULL,
+            unit_type_id INTEGER NOT NULL,
             quantity INTEGER NOT NULL DEFAULT 0,
             
-            PRIMARY KEY (settlement_id, unit_type),
+            PRIMARY KEY (settlement_id, unit_type_id),
             FOREIGN KEY (settlement_id) REFERENCES settlements(id) ON DELETE CASCADE,
-            FOREIGN KEY (unit_type) REFERENCES unit_types(unit_type)
+            FOREIGN KEY (unit_type_id) REFERENCES unit_types(id) ON DELETE CASCADE
         );
+    """)
+
+    cursor.execute("""
+        CREATE INDEX IF NOT EXISTS idx_garrison_units_settlement 
+            ON garrison_units(settlement_id);
     """)
     
     

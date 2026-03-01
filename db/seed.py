@@ -23,40 +23,16 @@ def seed_db():
     npc_enemy_id = cursor.fetchone()[0]
 
     # --------------------
-    # SETTLEMENT TYPES
-    # --------------------
-    cursor.execute("""
-        INSERT OR IGNORE INTO settlement_types
-        (name, base_food_rate, base_wood_rate, base_stone_rate, base_silver_rate, description)
-        VALUES 
-            ('village', 60.0, 36.0, 24.0, 12.0, 'A small village'),
-            ('town', 120.0, 72.0, 48.0, 30.0, 'A bustling town'),
-            ('city', 240.0, 150.0, 90.0, 60.0, 'A great city'),
-            ('castle', 180.0, 90.0, 120.0, 90.0, 'A fortified castle'),
-            ('outpost', 30.0, 90.0, 12.0, 6.0, 'A remote outpost');
-    """)
-    
-    cursor.execute("SELECT id, name FROM settlement_types")
-    settlement_type_ids = {name: id for id, name in cursor.fetchall()}
-    
-    # --------------------
-    # NPC SETTLEMENTS
+    # NPC SETTLEMENTS (Simplified - no settlement_type_id)
     # --------------------
     cursor.execute("""
         INSERT OR IGNORE INTO settlements
-        (player_id, name, x, y, settlement_type_id, 
-         food, wood, stone, silver, gold,
-         base_food_rate, base_wood_rate, base_stone_rate, base_silver_rate,
-         current_food_rate, current_wood_rate, current_stone_rate, current_silver_rate)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        (player_id, name, x, y)
+        VALUES (?, ?, ?, ?)
     """, (
         npc_enemy_id,
         "Northumbria",
-        400, 150,
-        settlement_type_ids["castle"], 
-        1000, 500, 200, 100, 10,
-        180.0, 90.0, 120.0, 90.0,  # base rates from castle type
-        180.0, 90.0, 120.0, 90.0   # current rates (same as base initially)
+        400, 150
     ))
 
     cursor.execute(
@@ -66,44 +42,150 @@ def seed_db():
     northumbria_id = cursor.fetchone()[0]
 
     # --------------------
-    # UNIT TYPES
+    # WORKER TYPES
     # --------------------
-    unit_types = [
-        ("infantry", 10, 5, 1, 10, 5),
-        ("archer", 7, 3, 1, 15, 0),
-        ("cavalry", 15, 10, 2, 20, 10)
+    worker_types = [
+        ("farmer", "Grows food and tends crops"),
+        ("woodman", "Chops wood from forests"),
+        ("stonemason", "Mines and quarries stone"),
+        ("hunter", "Hunts animals for food and pelts"),
+        ("builder", "Constructs structures and fortifications"),
+        ("soldier", "Combat unit - melee"),
+        ("archer", "Combat unit - ranged"),
     ]
 
     cursor.executemany("""
-        INSERT OR IGNORE INTO unit_types
-        (unit_type, attack, defense, health, cost_wood, cost_silver)
-        VALUES (?, ?, ?, ?, ?, ?)
-    """, unit_types)
+        INSERT OR IGNORE INTO worker_types (name, description)
+        VALUES (?, ?)
+    """, worker_types)
+
+    # Get worker type IDs
+    cursor.execute("SELECT id, name FROM worker_types")
+    worker_type_map = {name: id for id, name in cursor.fetchall()}
 
     # --------------------
-    # NPC PLAYER UNITS (Total Army)
+    # ACTIVITY TYPES
+    # --------------------
+    activity_types = [
+        # Food production
+        (worker_type_map["farmer"], "farm", "Tend crops and grow food", "food", 15.0),
+        (worker_type_map["hunter"], "hunt", "Hunt animals for food", "food", 12.0),
+        
+        # Wood production
+        (worker_type_map["woodman"], "chop_wood", "Harvest wood from forest", "wood", 10.0),
+        
+        # Stone production
+        (worker_type_map["stonemason"], "mine_stone", "Quarry and mine stone", "stone", 8.0),
+        
+        # Construction activities
+        (worker_type_map["builder"], "build_fence", "Build wooden fences", "defense", 5.0),
+        (worker_type_map["builder"], "build_stone_wall", "Build stone walls", "defense", 10.0),
+        (worker_type_map["builder"], "build_watchtower", "Build a watchtower", "defense", 15.0),
+    ]
+
+    cursor.executemany("""
+        INSERT OR IGNORE INTO activity_types 
+        (worker_type_id, name, description, produces_resource, base_resource_per_hour)
+        VALUES (?, ?, ?, ?, ?)
+    """, activity_types)
+
+    # Get activity type IDs
+    cursor.execute("SELECT id, name FROM activity_types")
+    activity_type_map = {name: id for id, name in cursor.fetchall()}
+
+    # --------------------
+    # SETTLEMENT WORKERS (Initial population)
     # --------------------
     cursor.executemany("""
-        INSERT OR IGNORE INTO player_units
-        (player_id, unit_type, quantity)
+        INSERT OR IGNORE INTO settlement_workers
+        (settlement_id, worker_type_id, quantity)
         VALUES (?, ?, ?)
     """, [
-        (npc_enemy_id, "infantry", 100),
-        (npc_enemy_id, "archer", 50),
-        (npc_enemy_id, "cavalry", 30)
+        (northumbria_id, worker_type_map["farmer"], 15),
+        (northumbria_id, worker_type_map["woodman"], 10),
+        (northumbria_id, worker_type_map["stonemason"], 8),
+        (northumbria_id, worker_type_map["hunter"], 5),
+        (northumbria_id, worker_type_map["builder"], 6),
+        (northumbria_id, worker_type_map["soldier"], 20),
+        (northumbria_id, worker_type_map["archer"], 10),
     ])
 
     # --------------------
-    # NPC GARRISON
+    # SETTLEMENT RESOURCES (Initial resources)
     # --------------------
     cursor.executemany("""
-        INSERT OR IGNORE INTO settlement_garrisons
-        (settlement_id, unit_type, quantity)
+        INSERT OR IGNORE INTO settlement_resources
+        (settlement_id, resource_type, quantity)
         VALUES (?, ?, ?)
     """, [
-        (northumbria_id, "infantry", 40),
-        (northumbria_id, "archer", 15),
-        (northumbria_id, "cavalry", 10)
+        (northumbria_id, "food", 5000),
+        (northumbria_id, "wood", 2000),
+        (northumbria_id, "stone", 1000),
+        (northumbria_id, "silver", 500),
+        (northumbria_id, "gold", 100),
+        (northumbria_id, "pelt", 0),
+    ])
+
+    # --------------------
+    # STRUCTURES
+    # --------------------
+    structures = [
+        ("wooden_fence", "A basic defensive structure", "defense: +5", 2.0, json.dumps({"wood": 100})),
+        ("stone_wall", "A stronger defensive wall", "defense: +15", 6.0, json.dumps({"stone": 200, "wood": 50})),
+        ("watchtower", "Provides vision and defense", "defense: +25, vision_range: 200", 8.0, json.dumps({"stone": 300, "wood": 100})),
+        ("barracks", "Enables unit training", "unit_training: true", 4.0, json.dumps({"wood": 200, "stone": 100})),
+        ("farm", "Increases food production", "food_production: +20", 1.0, json.dumps({"wood": 50})),
+        ("lumber_mill", "Increases wood efficiency", "wood_production: +15", 3.0, json.dumps({"stone": 75, "wood": 100})),
+        ("quarry", "Increases stone production", "stone_production: +15", 3.0, json.dumps({"wood": 75, "stone": 100})),
+    ]
+
+    cursor.executemany("""
+        INSERT OR IGNORE INTO structures
+        (name, description, provides, build_time_hours, requires_resources)
+        VALUES (?, ?, ?, ?, ?)
+    """, structures)
+
+    # --------------------
+    # UNIT TYPES
+    # --------------------
+    cursor.executemany("""
+        INSERT OR IGNORE INTO unit_types
+        (name, attack, defense, health, cost_wood, cost_silver)
+        VALUES (?, ?, ?, ?, ?, ?)
+    """, [
+        ("infantry", 10, 5, 1, 10, 5),
+        ("archer", 7, 3, 1, 15, 0),
+        ("cavalry", 15, 10, 2, 20, 10),
+    ])
+
+    # Get unit type IDs
+    cursor.execute("SELECT id, name FROM unit_types")
+    unit_type_map = {name: id for id, name in cursor.fetchall()}
+
+    # --------------------
+    # SETTLEMENT UNITS (NPC army at the settlement)
+    # --------------------
+    cursor.executemany("""
+        INSERT OR IGNORE INTO settlement_units
+        (settlement_id, unit_type_id, quantity)
+        VALUES (?, ?, ?)
+    """, [
+        (northumbria_id, unit_type_map["infantry"], 50),
+        (northumbria_id, unit_type_map["archer"], 25),
+        (northumbria_id, unit_type_map["cavalry"], 15),
+    ])
+
+    # --------------------
+    # GARRISON UNITS
+    # --------------------
+    cursor.executemany("""
+        INSERT OR IGNORE INTO garrison_units
+        (settlement_id, unit_type_id, quantity)
+        VALUES (?, ?, ?)
+    """, [
+        (northumbria_id, unit_type_map["infantry"], 40),
+        (northumbria_id, unit_type_map["archer"], 15),
+        (northumbria_id, unit_type_map["cavalry"], 10),
     ])
 
     # --------------------
