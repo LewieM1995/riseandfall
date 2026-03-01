@@ -1,8 +1,16 @@
+import sqlite3
 from werkzeug.security import generate_password_hash
 from db.connection import connect_db
 from datetime import datetime
 
+
+class UserCreationError(Exception):
+    """Custom exception for user creation errors"""
+    pass
+
+
 def user_exists(email: str) -> bool:
+    """Check if a user with the given email already exists."""
     conn = connect_db()
     cursor = conn.cursor()
 
@@ -12,12 +20,27 @@ def user_exists(email: str) -> bool:
     conn.close()
     return exists
 
+
 def create_user(username: str, email: str, password: str) -> dict:
+    """
+    Create a new user with a player and starting settlement.
+    
+    Args:
+        username: User's chosen username
+        email: User's email address
+        password: User's password (will be hashed)
+    
+    Returns:
+        Dictionary with user_id, username, email, player_id, settlement_id
+    
+    Raises:
+        UserCreationError: If user creation fails
+    """
     conn = connect_db()
     cursor = conn.cursor()
 
     try:
-        # Create user
+        # create user account
         password_hash = generate_password_hash(password)
         cursor.execute(
             "INSERT INTO users (username, email, password_hash) VALUES (?, ?, ?)",
@@ -25,71 +48,114 @@ def create_user(username: str, email: str, password: str) -> dict:
         )
         user_id = cursor.lastrowid
 
-        # Create player
+        # Create player associated with user
         cursor.execute(
             "INSERT INTO players (user_id, username, is_npc) VALUES (?, ?, 0)",
             (user_id, username)
         )
         player_id = cursor.lastrowid
 
-        # Get village settlement type to retrieve base rates
+        # Get default settlement type (village)
         cursor.execute(
-            "SELECT id, base_food_rate, base_wood_rate, base_stone_rate, base_silver_rate FROM settlement_types WHERE name = ?",
+            "SELECT id FROM settlement_types WHERE name = ?",
             ("village",)
         )
-        settlement_type = cursor.fetchone()
-        
-        if not settlement_type:
-            raise UserCreationError("Village settlement type not found. Database may not be seeded.")
-        
-        settlement_type_id = settlement_type[0]
-        base_food = settlement_type[1]
-        base_wood = settlement_type[2]
-        base_stone = settlement_type[3]
-        base_silver = settlement_type[4]
+        village_type = cursor.fetchone()
+        if not village_type:
+            raise UserCreationError(
+                "Settlement types not found. Please run 'python3 -m db.seed_db' to initialize database."
+            )
+        village_type_id = village_type[0]
 
-        # Create starting settlement with proper settlement_type_id and rate columns
+        # Create starting settlement
         cursor.execute("""
-            INSERT INTO settlements
-            (player_id, name, x, y, settlement_type_id, 
-             food, wood, stone, silver, gold,
-             base_food_rate, base_wood_rate, base_stone_rate, base_silver_rate,
-             current_food_rate, current_wood_rate, current_stone_rate, current_silver_rate)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            INSERT INTO settlements (player_id, name, settlement_type_id, x, y)
+            VALUES (?, ?, ?, ?, ?)
         """, (
             player_id,
             f"{username}'s Village",
-            100, 100,
-            settlement_type_id,
-            800, 400, 200, 100, 5,
-            base_food, base_wood, base_stone, base_silver,      # base rates from settlement_type
-            base_food, base_wood, base_stone, base_silver       # current rates (same as base initially)
+            village_type_id,
+            100, 100
         ))
-
         settlement_id = cursor.lastrowid
 
-        # Give player starting units (total army)
+        # Init settlement with starting workers
+        # Get worker type IDs
+        cursor.execute("SELECT id, name FROM worker_types WHERE name IN ('farmer', 'woodman', 'stonemason', 'hunter')")
+        worker_types = {name: wid for wid, name in cursor.fetchall()}
+        
+        if not worker_types or len(worker_types) < 4:
+            raise UserCreationError(
+                "Worker types not found. Please run 'python3 -m db.seed_db' to initialize database."
+            )
+        
+        # Assign starting workers to settlement
         cursor.executemany("""
-            INSERT INTO player_units (player_id, unit_type, quantity)
+            INSERT INTO settlement_workers (settlement_id, worker_type_id, quantity)
             VALUES (?, ?, ?)
         """, [
-            (player_id, "infantry", 20),
-            (player_id, "archer", 10)
+            (settlement_id, worker_types["farmer"], 10),
+            (settlement_id, worker_types["woodman"], 5),
+            (settlement_id, worker_types["stonemason"], 3),
+            (settlement_id, worker_types["hunter"], 2),
         ])
 
-        # garrison some units in the starting settlement
+        # Init settlement resources
+        starting_amounts = {
+            "food": 1000,
+            "wood": 500,
+            "stone": 300,
+            "silver": 100,
+            "gold": 10
+        }
+        
         cursor.executemany("""
-            INSERT INTO settlement_garrisons (settlement_id, unit_type, quantity)
+            INSERT INTO settlement_resources (settlement_id, resource_type, quantity)
             VALUES (?, ?, ?)
         """, [
-            (settlement_id, "infantry", 10),
-            (settlement_id, "archer", 5)
+            (settlement_id, resource, amount)
+            for resource, amount in starting_amounts.items()
+        ])
+
+        # get unit type IDs
+        cursor.execute("SELECT id, name FROM unit_types WHERE name IN ('infantry', 'archer')")
+        unit_types = {name: uid for uid, name in cursor.fetchall()}
+        
+        if not unit_types:
+            raise UserCreationError(
+                "Unit types not found. Please run 'python3 -m db.seed_db' to initialize database."
+            )
+        
+        # Assign starting units to settlement
+        cursor.executemany("""
+            INSERT INTO settlement_units (settlement_id, unit_type_id, quantity)
+            VALUES (?, ?, ?)
+        """, [
+            (settlement_id, unit_types["infantry"], 20),
+            (settlement_id, unit_types["archer"], 10)
+        ])
+
+        # Set up garrison (units defending the settlement)
+        cursor.executemany("""
+            INSERT INTO garrison_units (settlement_id, unit_type_id, quantity)
+            VALUES (?, ?, ?)
+        """, [
+            (settlement_id, unit_types["infantry"], 10),
+            (settlement_id, unit_types["archer"], 5)
         ])
         
-        cursor.execute("""
-           INSERT INTO player_research (player_id, node_id, unlocked_at)
-           VALUES (?, ?, ?)
-        """, (player_id, 1, datetime.now()))  # Starting research node for testing
+        # Give player starting research (optional - for testing/onboarding)
+        # Get first settlement research node
+        cursor.execute(
+            "SELECT id FROM research_nodes WHERE sector = 'settlements' LIMIT 1"
+        )
+        first_research = cursor.fetchone()
+        
+        if first_research:
+            cursor.execute("""
+                INSERT INTO player_research (player_id, node_id, unlocked_at)
+                VALUES (?, ?, ?)
+            """, (player_id, first_research[0], datetime.now()))
 
         conn.commit()
         
@@ -97,13 +163,14 @@ def create_user(username: str, email: str, password: str) -> dict:
             "id": user_id,
             "username": username,
             "email": email,
-            "player_id": player_id
+            "player_id": player_id,
+            "settlement_id": settlement_id
         }
 
     except sqlite3.IntegrityError as e:
         conn.rollback()
-        # Check what constraint failed
         error_msg = str(e).lower()
+        
         if 'email' in error_msg:
             raise UserCreationError("Email already exists")
         elif 'username' in error_msg:

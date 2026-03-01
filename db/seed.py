@@ -23,15 +23,36 @@ def seed_db():
     npc_enemy_id = cursor.fetchone()[0]
 
     # --------------------
-    # NPC SETTLEMENTS (Simplified - no settlement_type_id)
+    # SETTLEMENT TYPES
+    # --------------------
+    settlement_types = [
+        ("village", "A small village", "/village.png"),
+        ("town", "A bustling town", "/town.png"),
+        ("castle", "A fortified castle", "/castle.png"),
+        ("monastery", "A religious sanctuary", "/monastery.png"),
+        ("outpost", "A remote outpost", "/outpost.png"),
+    ]
+
+    cursor.executemany("""
+        INSERT OR IGNORE INTO settlement_types (name, description, image_path)
+        VALUES (?, ?, ?)
+    """, settlement_types)
+
+    # Get settlement type ID for NPC settlement
+    cursor.execute("SELECT id FROM settlement_types WHERE name = ?", ("castle",))
+    castle_type_id = cursor.fetchone()[0]
+
+    # --------------------
+    # NPC SETTLEMENTS
     # --------------------
     cursor.execute("""
         INSERT OR IGNORE INTO settlements
-        (player_id, name, x, y)
-        VALUES (?, ?, ?, ?)
+        (player_id, name, settlement_type_id, x, y)
+        VALUES (?, ?, ?, ?, ?)
     """, (
         npc_enemy_id,
         "Northumbria",
+        castle_type_id,
         400, 150
     ))
 
@@ -146,16 +167,16 @@ def seed_db():
     """, structures)
 
     # --------------------
-    # UNIT TYPES
+    # UNIT TYPES (Definitions of available units)
     # --------------------
     cursor.executemany("""
         INSERT OR IGNORE INTO unit_types
-        (name, attack, defense, health, cost_wood, cost_silver)
-        VALUES (?, ?, ?, ?, ?, ?)
+        (name, description, attack, defense, health, cost_wood, cost_silver)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
     """, [
-        ("infantry", 10, 5, 1, 10, 5),
-        ("archer", 7, 3, 1, 15, 0),
-        ("cavalry", 15, 10, 2, 20, 10),
+        ("infantry", "Basic melee unit - reliable and cost-effective", 10, 5, 1, 10, 5),
+        ("archer", "Ranged unit - good for defense and ranged attacks", 7, 3, 1, 15, 0),
+        ("cavalry", "Heavy mounted unit - high attack and defense", 15, 10, 2, 20, 10),
     ])
 
     # Get unit type IDs
@@ -163,29 +184,34 @@ def seed_db():
     unit_type_map = {name: id for id, name in cursor.fetchall()}
 
     # --------------------
-    # SETTLEMENT UNITS (NPC army at the settlement)
+    # SETTLEMENT UNITS - Primary storage
+    # All units at a settlement (pool of available units)
     # --------------------
     cursor.executemany("""
         INSERT OR IGNORE INTO settlement_units
         (settlement_id, unit_type_id, quantity)
         VALUES (?, ?, ?)
     """, [
-        (northumbria_id, unit_type_map["infantry"], 50),
-        (northumbria_id, unit_type_map["archer"], 25),
-        (northumbria_id, unit_type_map["cavalry"], 15),
+        # Northumbria (NPC settlement) - total units available
+        (northumbria_id, unit_type_map["infantry"], 50),    # 50 infantry total
+        (northumbria_id, unit_type_map["archer"], 25),      # 25 archers total
+        (northumbria_id, unit_type_map["cavalry"], 15),     # 15 cavalry total
     ])
 
     # --------------------
-    # GARRISON UNITS
+    # GARRISON UNITS - Subset of settlement_units
+    # Units currently assigned to defend the settlement
+    # IMPORTANT: garrison quantity must be <= settlement_units quantity
     # --------------------
     cursor.executemany("""
         INSERT OR IGNORE INTO garrison_units
         (settlement_id, unit_type_id, quantity)
         VALUES (?, ?, ?)
     """, [
-        (northumbria_id, unit_type_map["infantry"], 40),
-        (northumbria_id, unit_type_map["archer"], 15),
-        (northumbria_id, unit_type_map["cavalry"], 10),
+        # Northumbria - units currently defending (subset of total)
+        (northumbria_id, unit_type_map["infantry"], 40),    # 40 of 50 defending
+        (northumbria_id, unit_type_map["archer"], 15),      # 15 of 25 defending
+        (northumbria_id, unit_type_map["cavalry"], 10),     # 10 of 15 defending
     ])
 
     # --------------------

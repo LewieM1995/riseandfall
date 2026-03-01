@@ -54,18 +54,20 @@ def init_db():
     """)
 
     # --------------------
-    # SETTLEMENTS (Simplified - just locations)
+    # SETTLEMENTS (with settlement type)
     # --------------------
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS settlements (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             player_id INTEGER NOT NULL,
             name TEXT NOT NULL,
+            settlement_type_id INTEGER,
             x INTEGER NOT NULL,
             y INTEGER NOT NULL,
             created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
 
-            FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE
+            FOREIGN KEY (player_id) REFERENCES players(id) ON DELETE CASCADE,
+            FOREIGN KEY (settlement_type_id) REFERENCES settlement_types(id) ON DELETE SET NULL
         );
     """)
 
@@ -75,6 +77,18 @@ def init_db():
 
     cursor.execute("""
         CREATE INDEX IF NOT EXISTS idx_settlements_coords ON settlements(x, y);
+    """)
+
+    # --------------------
+    # SETTLEMENT TYPES
+    # --------------------
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS settlement_types (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT UNIQUE NOT NULL,
+            description TEXT,
+            image_path TEXT
+        );
     """)
 
     # --------------------
@@ -240,12 +254,13 @@ def init_db():
     """)
 
     # --------------------
-    # UNIT TYPES
+    # UNIT TYPES (Definitions)
     # --------------------
     cursor.execute("""
         CREATE TABLE IF NOT EXISTS unit_types (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             name TEXT UNIQUE NOT NULL,
+            description TEXT,
             attack INTEGER NOT NULL,
             defense INTEGER NOT NULL,
             health INTEGER NOT NULL,
