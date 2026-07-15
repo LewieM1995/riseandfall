@@ -15,29 +15,14 @@ CORS(
     supports_credentials=True
 )
 
-from routes.army import army_bp
-app.register_blueprint(army_bp)
+from player.routes import player_bp
+app.register_blueprint(player_bp)
 
-from routes.resources import resource_bp
-app.register_blueprint(resource_bp)
+from auth.routes import auth_bp
+app.register_blueprint(auth_bp)
 
-from routes.signup import sign_up_bp
-app.register_blueprint(sign_up_bp)
-
-from routes.login import login_bp
-app.register_blueprint(login_bp)
-
-from routes.settlements import settlement_bp
-app.register_blueprint(settlement_bp)
-
-from routes.logout import logout_bp
-app.register_blueprint(logout_bp)
-
-from routes.neighbors import neighbors
-app.register_blueprint(neighbors)
-
-from routes.research import research
-app.register_blueprint(research)
+from resources.routes import resources_bp
+app.register_blueprint(resources_bp)
 
 if __name__ == '__main__':
     print("🚀 Starting resource tick service...")

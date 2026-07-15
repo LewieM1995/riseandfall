@@ -20,3 +20,5 @@ def decode_token(token: str) -> str | None:
     except jwt.InvalidTokenError:
         print("Invalid token")
         return None
+
+"decode_token.py"

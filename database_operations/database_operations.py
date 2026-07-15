@@ -63,3 +63,5 @@ def resolve_settlement_type_names() -> dict:
     conn.close()
 
     return settlement_types
+
+"database_operations.py"

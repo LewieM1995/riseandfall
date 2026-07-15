@@ -1,11 +1,10 @@
-import jwt
 from functools import wraps
-from flask import request, jsonify
-from dotenv import load_dotenv
-import os
 
-load_dotenv()
-SECRET_KEY = os.getenv("SECRET_KEY")
+import jwt
+from flask import request, jsonify
+
+from .tokens import SECRET_KEY, ALGORITHM
+
 
 def require_auth(fn: callable) -> callable:
     @wraps(fn)
@@ -16,7 +15,7 @@ def require_auth(fn: callable) -> callable:
             return jsonify({"error": "Unauthorized"}), 401
 
         try:
-            payload = jwt.decode(token, SECRET_KEY, algorithms=["HS256"])
+            payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
             request.user_id = payload["user_id"]
         except jwt.ExpiredSignatureError:
             return jsonify({"error": "Token expired"}), 401

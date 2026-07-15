@@ -43,3 +43,6 @@ def get_player_id_for_user(user_id: int) -> int | None:
     finally:
         cursor.close()
         conn.close()
+        
+        
+        "user_operations.py"

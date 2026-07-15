@@ -188,3 +188,6 @@ def create_user(username: str, email: str, password: str) -> dict:
     
     finally:
         conn.close()
+        
+        
+    "signup_operations.py"
