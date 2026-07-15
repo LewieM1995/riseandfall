@@ -10,7 +10,7 @@ def apply_resource_tick(settlement_id: int, cursor) -> None:
     
     For each in-progress activity:
     - Calculate hours elapsed since start
-    - Generate resources: workers × base_rate × hours × modifiers
+    - Generate resources: workers * base_rate * hours * modifiers
     - Add to settlement_resources
     - Update activity output
     """
@@ -58,7 +58,7 @@ def apply_resource_tick(settlement_id: int, cursor) -> None:
         
         # Get activity modifiers (buffs/debuffs)
         cursor.execute("""
-            SELECT COALESCE(SUM(multiplier), 1.0) as total_modifier
+            SELECT COALESCE(SUM(multiplier), 0.0) as total_modifier
             FROM activity_modifiers
             WHERE settlement_id = ? AND activity_type_id = ? 
             AND (expires_at IS NULL OR expires_at > ?)
@@ -68,7 +68,7 @@ def apply_resource_tick(settlement_id: int, cursor) -> None:
         modifier = modifier_result['total_modifier'] if modifier_result else 1.0
         
         # Calculate resource generation
-        # Formula: workers × base_rate × hours × modifiers
+        # Formula: workers * base_rate * hours * modifiers
         resource_generated = assigned_workers * base_rate * hours * modifier
         
         # Add to settlement resources
@@ -104,7 +104,7 @@ def apply_resource_tick(settlement_id: int, cursor) -> None:
         
         print(f"Settlement {settlement_id} Activity {activity_id}: "
               f"Generated {resource_generated:.0f} {resource_type} over {hours:.2f} hours "
-              f"({assigned_workers} workers × {base_rate}/hr × {modifier:.2f} modifier). "
+              f"({assigned_workers} workers * {base_rate}/hr * {modifier:.2f} modifier). "
               f"XP gained: {xp_gained}")
     
     # Award total XP to player
