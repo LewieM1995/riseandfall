@@ -1,13 +1,14 @@
-
-
 from datetime import datetime
 
 from db.connection import connect_db
 from .repository import (
-    get_in_progress_activities,
-    get_activity_modifier,
+    get_occupied_producing_plots,
+    get_settlement_geography_modifier,
+    get_active_buff_bonus,
+    get_player_production_research_multiplier,
     upsert_settlement_resource,
-    add_activity_output,
+    get_last_ticked_at,
+    update_last_ticked_at,
     get_resource_totals_by_player_id,
 )
 from player.repository import get_player_id_for_user
@@ -23,7 +24,6 @@ XP_MULTIPLIERS = {
     "silver": 2.0,
     "gold": 5.0,
     "pelt": 1.5,
-    "defense": 2.0,
 }
 
 
@@ -33,60 +33,68 @@ def calculate_xp_for_resource(resource_type: str, amount: float) -> int:
 
 
 def apply_resource_tick(cursor, settlement_id: int) -> None:
-    """Process all in-progress activities at a settlement: generate
-    resources since each activity started, record output, and award XP.
+    """Generate resources for every occupied, producing plot at a
+    settlement since it was last ticked, and award XP for the total.
 
     Takes a cursor rather than opening its own connection because the
     background tick service processes many settlements in one
-    transaction (see background/resource_tick_service.py) — this lets
-    all of them commit or roll back together.
+    transaction — this lets them all commit or roll back together.
     """
-    activities = get_in_progress_activities(cursor, settlement_id)
-    if not activities:
+    plots = get_occupied_producing_plots(cursor, settlement_id)
+    if not plots:
         return
 
     current_time = datetime.utcnow()
+    last_ticked_raw = get_last_ticked_at(cursor, settlement_id)
+    last_ticked_at = (
+        datetime.fromisoformat(last_ticked_raw) if last_ticked_raw else current_time
+    )
+
+    elapsed_seconds = int((current_time - last_ticked_at).total_seconds())
+    elapsed_seconds = max(0, min(elapsed_seconds, MAX_CATCHUP_SECONDS))
+
+    if elapsed_seconds < 1:
+        return
+
+    hours = elapsed_seconds / 3600
+
+    player_id = plots[0]["player_id"]
     total_xp_gained = 0
-    player_id = None
 
-    for activity in activities:
-        activity_id = activity["id"]
-        activity_type_id = activity["activity_type_id"]
-        assigned_workers = activity["assigned_workers"]
-        started_at = datetime.fromisoformat(activity["started_at"])
-        resource_type = activity["produces_resource"]
-        base_rate = activity["base_resource_per_hour"]
-        player_id = activity["player_id"]
+    # Aggregate production per resource type across all plots before
+    # writing — a settlement might have 3 farms, we want one upsert for
+    # "food", not three.
+    production_by_resource: dict[str, float] = {}
 
-        elapsed_seconds = int((current_time - started_at).total_seconds())
-        elapsed_seconds = max(0, min(elapsed_seconds, MAX_CATCHUP_SECONDS))
+    for plot in plots:
+        resource_type = plot["produces_resource"]
+        base_rate = plot["base_resource_per_hour"]
 
-        if elapsed_seconds < 1:
-            continue
+        geography_modifier = get_settlement_geography_modifier(cursor, settlement_id, resource_type)
+        buff_bonus = get_active_buff_bonus(cursor, settlement_id, resource_type, current_time)
+        research_multiplier = get_player_production_research_multiplier(cursor, player_id, resource_type)
 
-        hours = elapsed_seconds / 3600
-        modifier = get_activity_modifier(cursor, settlement_id, activity_type_id, current_time)
+        # 1.0 baseline + buff bonus, then multiplied by geography and research.
+        # Buffs are additive to baseline so "no active buffs" never zeroes production.
+        total_modifier = (1.0 + buff_bonus) * geography_modifier * research_multiplier
 
-        resource_generated = assigned_workers * base_rate * hours * modifier
-
-        upsert_settlement_resource(
-            cursor, settlement_id, resource_type, resource_generated, current_time.isoformat()
+        resource_generated = base_rate * hours * total_modifier
+        production_by_resource[resource_type] = (
+            production_by_resource.get(resource_type, 0.0) + resource_generated
         )
-        add_activity_output(cursor, activity_id, resource_generated)
 
-        xp_gained = calculate_xp_for_resource(resource_type, resource_generated)
-        total_xp_gained += xp_gained
+    for resource_type, amount in production_by_resource.items():
+        upsert_settlement_resource(cursor, settlement_id, resource_type, amount, current_time.isoformat())
+        total_xp_gained += calculate_xp_for_resource(resource_type, amount)
 
         print(
-            f"Settlement {settlement_id} Activity {activity_id}: "
-            f"Generated {resource_generated:.0f} {resource_type} over {hours:.2f} hours "
-            f"({assigned_workers} workers * {base_rate}/hr * {modifier:.2f} modifier). "
-            f"XP gained: {xp_gained}"
+            f"Settlement {settlement_id}: Generated {amount:.0f} {resource_type} "
+            f"over {hours:.2f} hours."
         )
 
+    update_last_ticked_at(cursor, settlement_id, current_time.isoformat())
+
     if total_xp_gained > 0 and player_id:
-        # Single cross-domain call — resources doesn't touch XP columns
-        # or level-up logic directly, player.service owns both.
         add_experience(cursor, player_id, total_xp_gained)
 
 

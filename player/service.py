@@ -97,8 +97,8 @@ def get_player_profile(user_id: int) -> Player | None:
 
 
 def create_new_player_with_starting_kingdom(cursor, user_id: int, username: str) -> dict:
-    """Bootstrap a brand-new player: player row, starting settlement,
-    workers, resources, units, garrison, and first research node.
+    """Bootstrap a brand-new player: player row, starting settlement with
+    empty plots, resources, units, garrison, and first research node.
 
     Takes a cursor (not a connection) because this is called from
     auth.service.signup as part of ONE transaction with the user-row
@@ -113,47 +113,39 @@ def create_new_player_with_starting_kingdom(cursor, user_id: int, username: str)
     natural candidates to move to settlements/repository.py,
     resources/repository.py, army/repository.py, and
     research/repository.py at that point.
+
+    Starting settlement type is 'Village' (5 plots) per the plot-based
+    redesign — plots start empty; the player builds their own farms/
+    mines/etc via the (future) build action, nothing is pre-assigned.
     """
     try:
         player_id = insert_player(cursor, user_id, username)
 
-        cursor.execute("SELECT id FROM settlement_types WHERE name = ?", ("village",))
+        cursor.execute(
+            "SELECT id, base_plot_count FROM settlement_types WHERE name = ?", ("village",)
+        )
         village_type = cursor.fetchone()
         if not village_type:
             raise PlayerSetupError(
                 "Settlement types not found. Please run 'python3 -m db.seed_db' to initialize database."
             )
-        village_type_id = village_type[0]
+        village_type_id, plot_count = village_type["id"], village_type["base_plot_count"]
 
         cursor.execute(
             """
-            INSERT INTO settlements (player_id, name, settlement_type_id, x, y)
-            VALUES (?, ?, ?, ?, ?)
+            INSERT INTO settlements (player_id, name, settlement_type_id, x, y, last_ticked_at)
+            VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
             """,
             (player_id, f"{username}'s Village", village_type_id, 100, 100),
         )
         settlement_id = cursor.lastrowid
 
-        cursor.execute(
-            "SELECT id, name FROM worker_types WHERE name IN ('farmer', 'woodman', 'stonemason', 'hunter')"
-        )
-        worker_types = {name: wid for wid, name in cursor.fetchall()}
-        if not worker_types or len(worker_types) < 4:
-            raise PlayerSetupError(
-                "Worker types not found. Please run 'python3 -m db.seed_db' to initialize database."
-            )
-
         cursor.executemany(
-            "INSERT INTO settlement_workers (settlement_id, worker_type_id, quantity) VALUES (?, ?, ?)",
-            [
-                (settlement_id, worker_types["farmer"], 10),
-                (settlement_id, worker_types["woodman"], 5),
-                (settlement_id, worker_types["stonemason"], 3),
-                (settlement_id, worker_types["hunter"], 2),
-            ],
+            "INSERT INTO settlement_plots (settlement_id, plot_index) VALUES (?, ?)",
+            [(settlement_id, i) for i in range(plot_count)],
         )
 
-        starting_amounts = {"food": 1000, "wood": 500, "pelt": 50, "stone": 300, "silver": 100, "gold": 10}
+        starting_amounts = {"food": 1000, "wood": 500, "stone": 300, "silver": 100, "gold": 10}
         cursor.executemany(
             "INSERT INTO settlement_resources (settlement_id, resource_type, quantity) VALUES (?, ?, ?)",
             [(settlement_id, resource, amount) for resource, amount in starting_amounts.items()],

@@ -1,7 +1,7 @@
 from flask import Flask
 from flask_cors import CORS
 
-from systems.resources.resource_tick_service import get_tick_service
+from background.resource_tick_service import get_tick_service
 import atexit
 import logging
 
@@ -23,6 +23,12 @@ app.register_blueprint(auth_bp)
 
 from resources.routes import resources_bp
 app.register_blueprint(resources_bp)
+
+from settlements.routes import settlements_bp
+app.register_blueprint(settlements_bp)
+
+from research.routes import research
+app.register_blueprint(research)
 
 if __name__ == '__main__':
     print("🚀 Starting resource tick service...")
